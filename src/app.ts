@@ -12,11 +12,11 @@ const configuredAllowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
-const defaultAllowedOrigins = [
-  process.env.RENDER_EXTERNAL_URL,
-  'http://localhost:3000',
-  'http://localhost:3001',
-].filter(Boolean) as string[];
+
+const defaultAllowedOrigins = ['http://localhost:3000', 'http://localhost:3001'].filter(
+  Boolean
+) as string[];
+
 const allowedOrigins = new Set([...configuredAllowedOrigins, ...defaultAllowedOrigins]);
 
 app.use(
