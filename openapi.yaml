@@ -1030,12 +1030,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [rating]
-              properties:
-                rating:
-                  type: integer
-                  example: 4
+              $ref: '#/components/schemas/RatingWriteRequest'
       responses:
         '201':
           description: Rating created
@@ -1090,7 +1085,9 @@ paths:
               properties:
                 rating:
                   type: integer
-                  example: 4
+                  maximum: 5
+                  description: Ratings above `5` are stored as `5`.
+                  example: 5
       responses:
         '200':
           description: Rating updated
@@ -2635,7 +2632,9 @@ components:
           example: 7
         rating:
           type: integer
-          example: 4
+          maximum: 5
+          description: Ratings above `5` are stored as `5`.
+          example: 5
         title_id:
           type: integer
           example: 99
@@ -2774,10 +2773,13 @@ components:
       properties:
         rating:
           type: integer
-          example: 4
+          maximum: 5
+          description: Ratings above `5` are stored as `5`.
+          example: 5
         media_type:
           type: string
           enum: [movie, tv]
+          default: movie
           example: movie
 
     Issue:

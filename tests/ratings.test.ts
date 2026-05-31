@@ -81,6 +81,28 @@ describe('POST /v1/ratings/:title_id', () => {
       .send({ rating: 5, media_type: 'movie' });
 
     expect(res.status).toBe(200);
+    expect(prisma.rating.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { rating: 5 },
+      })
+    );
+    expect(res.body).toEqual({ data: ratingRecord({ rating: 5 }) });
+  });
+
+  it('caps new ratings above 5 down to 5', async () => {
+    (prisma.rating.create as jest.Mock).mockResolvedValue(ratingRecord({ rating: 5 }));
+
+    const res = await request(app)
+      .post('/v1/ratings/99')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ rating: 9, media_type: 'movie' });
+
+    expect(res.status).toBe(201);
+    expect(prisma.rating.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ rating: 5 }),
+      })
+    );
     expect(res.body).toEqual({ data: ratingRecord({ rating: 5 }) });
   });
 
@@ -181,6 +203,23 @@ describe('PATCH /v1/ratings/:title_id', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ data: ratingRecord({ rating: 2 }) });
+  });
+
+  it('caps updated ratings above 5 down to 5', async () => {
+    (prisma.rating.update as jest.Mock).mockResolvedValue(ratingRecord({ rating: 5 }));
+
+    const res = await request(app)
+      .patch('/v1/ratings/99')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ rating: 8 });
+
+    expect(res.status).toBe(200);
+    expect(prisma.rating.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { rating: 5 },
+      })
+    );
+    expect(res.body).toEqual({ data: ratingRecord({ rating: 5 }) });
   });
 
   it('returns 404 when the rating is missing', async () => {

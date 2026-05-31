@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { prisma } from '../../prisma';
 import { Prisma } from '@prisma/client';
 
+const normalizeRating = (rating: number) => Math.min(rating, 5);
+
 /**
  * Create a new rating
  *
@@ -10,7 +12,8 @@ import { Prisma } from '@prisma/client';
 export const createRating = async (request: Request, response: Response) => {
   const authorId = request.user!.id;
   const title_id = Number(request.params.title_id);
-  const { rating, media_type } = request.body;
+  const rating = normalizeRating(Number(request.body.rating));
+  const { media_type } = request.body;
 
   try {
     const titleRating = await prisma.rating.create({
@@ -126,7 +129,7 @@ export const getRatingByUserIdMovieId = async (request: Request, response: Respo
 export const updateUsersRating = async (request: Request, response: Response) => {
   const authorId = request.user!.id;
   const title_id = Number(request.params.title_id);
-  const { rating } = request.body;
+  const rating = normalizeRating(Number(request.body.rating));
 
   try {
     const updatedRating = await prisma.rating.update({
