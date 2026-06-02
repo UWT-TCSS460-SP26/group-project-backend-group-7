@@ -1,7 +1,30 @@
 import { Request, Response } from 'express';
 
 const BASE_URL_MOVIE = 'https://api.themoviedb.org/3/search/movie';
+const BASE_URL_DISCOVER_MOVIE = 'https://api.themoviedb.org/3/discover/movie';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
+const GENRE: Record<string, number> = {
+  action: 28,
+  adventure: 12,
+  animation: 16,
+  comedy: 35,
+  crime: 80,
+  documentary: 99,
+  drama: 18,
+  family: 10751,
+  fantasy: 14,
+  history: 36,
+  horror: 27,
+  music: 10402,
+  mystery: 9648,
+  romance: 10749,
+  science_fiction: 878,
+  sci_fi: 878,
+  thriller: 53,
+  tv_movie: 10770,
+  war: 10752,
+  western: 37,
+};
 
 type TMDBMovie = {
   id: number;
@@ -63,21 +86,81 @@ export const getSearchedMovieTitle = async (request: Request, response: Response
     });
   }
 
-  const result = await fetch(`${BASE_URL_MOVIE}?query=${encodeURIComponent(title)}`, {
-    headers: {
-      Authorization: `Bearer ${process.env.TMDB_API_TOKEN}`,
-      accept: 'application/json',
-    },
-  });
+  try {
+    const result = await fetch(`${BASE_URL_MOVIE}?query=${encodeURIComponent(title)}`, {
+      headers: {
+        Authorization: `Bearer ${process.env.TMDB_API_TOKEN}`,
+        accept: 'application/json',
+      },
+    });
 
-  if (!result.ok) {
-    return response.status(result.status).json({
-      error: result.status,
-      message: 'TMDB could not complete the movie title search request.',
+    if (!result.ok) {
+      return response.status(result.status).json({
+        error: result.status,
+        message: 'TMDB could not complete the movie title search request.',
+      });
+    }
+
+    const data = (await result.json()) as TMDBMovieSearchResponse;
+
+    return response.status(200).json(formatMovieSearchResponse(data));
+  } catch (_error) {
+    return response.status(502).json({
+      error: 502,
+      message: 'The API could not reach TMDB while searching for movies by title.',
+    });
+  }
+};
+
+export const getSearchedMovieGenre = async (request: Request, response: Response) => {
+  const genre = request.query.q as string;
+  const page = Number(request.query.page ?? 1);
+
+  if (typeof genre !== 'string' || genre === null || genre.trim() === '') {
+    return response.status(400).json({
+      error: 400,
+      message: 'The required query parameter "q" must be a non-empty movie genre name.',
     });
   }
 
-  const data = (await result.json()) as TMDBMovieSearchResponse;
+  if (page <= 0 || !Number.isInteger(page)) {
+    return response.status(400).json({
+      error: 400,
+      message: 'The query parameter "page" must be a positive integer.',
+    });
+  }
 
-  return response.status(200).json(formatMovieSearchResponse(data));
+  const genreCode = GENRE[genre.toLowerCase().replace(/\s+/g, '_')];
+
+  if (!genreCode) {
+    return response.status(404).json({
+      error: 404,
+      message: 'The provided movie genre could not be matched to a supported genre.',
+    });
+  }
+
+  try {
+    const result = await fetch(`${BASE_URL_DISCOVER_MOVIE}?with_genres=${genreCode}&page=${page}`, {
+      headers: {
+        Authorization: `Bearer ${process.env.TMDB_API_TOKEN}`,
+        accept: 'application/json',
+      },
+    });
+
+    if (!result.ok) {
+      return response.status(result.status).json({
+        error: result.status,
+        message: 'TMDB could not complete the movie genre search request.',
+      });
+    }
+
+    const data = (await result.json()) as TMDBMovieSearchResponse;
+
+    return response.status(200).json(formatMovieSearchResponse(data));
+  } catch (_error) {
+    return response.status(502).json({
+      error: 502,
+      message: 'The API could not reach TMDB while searching for movies by genre.',
+    });
+  }
 };

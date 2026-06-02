@@ -1,5 +1,10 @@
 module.exports = {
-  apiReference: () => (_request, response) => {
-    response.status(200).send('Scalar mock');
-  },
+  apiReference:
+    (options = {}) =>
+    (_request, response) => {
+      response.status(200).json({
+        title: 'Scalar mock',
+        spec: options.content,
+      });
+    },
 };

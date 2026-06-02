@@ -425,6 +425,153 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error: 'The server is missing required configuration for TMDB_API_TOKEN.'
+        '502':
+          description: The server could not reach TMDB while performing the movie title search.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NumericErrorResponse'
+              example:
+                error: 502
+                message: 'The API could not reach TMDB while searching for movies by title.'
+
+  /v1/movie/search:
+    get:
+      tags: [Movies]
+      summary: Search movies by title
+      description: Alias for the movie title search endpoint. Searches movies by title through TMDB and returns app-friendly result data.
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+          description: Movie title to search for.
+          example: inception
+      responses:
+        '200':
+          description: Movie search results returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovieSearchResponse'
+        '400':
+          description: The required `q` query parameter is missing, empty, or invalid for a movie title search.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NumericErrorResponse'
+              example:
+                error: 400
+                message: 'The required query parameter "q" must be a non-empty movie title.'
+        '401':
+          description: TMDB rejected the upstream movie search request, usually because the upstream credentials were invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NumericErrorResponse'
+              example:
+                error: 401
+                message: 'TMDB could not complete the movie title search request.'
+        default:
+          description: TMDB returned an unexpected error while processing the movie title search request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NumericErrorResponse'
+              example:
+                error: 503
+                message: 'TMDB could not complete the movie title search request.'
+        '500':
+          description: The server is missing the TMDB API token needed to perform movie title searches.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: 'The server is missing required configuration for TMDB_API_TOKEN.'
+        '502':
+          description: The server could not reach TMDB while performing the movie title search.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NumericErrorResponse'
+              example:
+                error: 502
+                message: 'The API could not reach TMDB while searching for movies by title.'
+
+  /v1/movie/search/genre:
+    get:
+      tags: [Movies]
+      summary: Search movies by genre
+      description: Returns movies from TMDB that match a genre name. Use this when the frontend wants to browse by genre instead of title.
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+          description: Movie genre to search for.
+          example: action
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: Page number of TMDB discover results.
+          example: 2
+      responses:
+        '200':
+          description: Movie genre search results returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovieSearchResponse'
+        '400':
+          description: The required `q` query parameter is missing, empty, or the optional `page` value is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NumericErrorResponse'
+              example:
+                error: 400
+                message: 'The required query parameter "q" must be a non-empty movie genre name.'
+        '404':
+          description: The provided movie genre was not recognized by the API's supported genre mapping.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NumericErrorResponse'
+              example:
+                error: 404
+                message: 'The provided movie genre could not be matched to a supported genre.'
+        default:
+          description: TMDB returned an unexpected error while processing the movie genre search request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NumericErrorResponse'
+              example:
+                error: 503
+                message: 'TMDB could not complete the movie genre search request.'
+        '500':
+          description: The server is missing the TMDB API token needed to perform movie genre searches.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: 'The server is missing required configuration for TMDB_API_TOKEN.'
+        '502':
+          description: The server could not reach TMDB while performing the movie genre search.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NumericErrorResponse'
+              example:
+                error: 502
+                message: 'The API could not reach TMDB while searching for movies by genre.'
 
   /v1/tv/search/genre:
     get:
