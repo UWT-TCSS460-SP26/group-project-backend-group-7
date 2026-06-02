@@ -32,6 +32,12 @@ const jwtCheck = expressjwt({
 });
 
 export const requireAuth = (request: Request, response: Response, next: NextFunction): void => {
+  // Let CORS preflight requests pass through without forcing bearer auth.
+  if (request.method === 'OPTIONS') {
+    next();
+    return;
+  }
+
   void jwtCheck(request, response, async (err) => {
     if (err) {
       response.status(401).json({
@@ -41,6 +47,13 @@ export const requireAuth = (request: Request, response: Response, next: NextFunc
     }
     const authHeader = request.headers.authorization as string;
     const auth = (request as unknown as { auth: { sub: string } }).auth;
+
+    if (!auth?.sub) {
+      response.status(401).json({
+        error: 'The bearer token is missing or could not be parsed.',
+      });
+      return;
+    }
 
     let dbUser = await prisma.user.findUnique({ where: { subjectId: auth.sub } });
 

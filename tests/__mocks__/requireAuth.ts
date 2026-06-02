@@ -21,6 +21,11 @@ declare global {
 }
 
 export const requireAuth = (request: Request, response: Response, next: NextFunction): void => {
+  if (request.method === 'OPTIONS') {
+    next();
+    return;
+  }
+
   const authHeader = request.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
     response.status(401).json({ error: authErrorMessages.missing });

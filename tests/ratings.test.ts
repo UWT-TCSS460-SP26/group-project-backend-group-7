@@ -169,6 +169,13 @@ describe('GET /v1/ratings/title/:title_id', () => {
 });
 
 describe('GET /v1/ratings/user/:authorId/title/:title_id', () => {
+  it('allows OPTIONS preflight without auth', async () => {
+    const res = await request(app).options('/v1/ratings/user/7/title/99');
+
+    expect(res.status).toBe(200);
+    expect(res.headers.allow).toContain('GET');
+  });
+
   it('returns one user rating for one title', async () => {
     (prisma.rating.findUnique as jest.Mock).mockResolvedValue(ratingRecord());
 
