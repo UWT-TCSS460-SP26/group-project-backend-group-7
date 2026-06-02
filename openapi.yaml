@@ -1330,6 +1330,70 @@ paths:
               example:
                 error: 'The server could not retrieve reviews for the requested title.'
 
+  /v1/reviews/user/{user_id}:
+    get:
+      tags: [Reviews]
+      summary: Get reviews written by a user
+      description: Returns paginated reviews authored by one user. You can optionally narrow the results to one movie with `movie_id` or one TV title with `tv_id`.
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Internal user identifier for the review author
+        - in: query
+          name: movie_id
+          schema:
+            type: integer
+            minimum: 1
+          description: Optional TMDB movie identifier. Cannot be combined with `tv_id`.
+        - in: query
+          name: tv_id
+          schema:
+            type: integer
+            minimum: 1
+          description: Optional TMDB TV identifier. Cannot be combined with `movie_id`.
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+          description: Results per page
+      responses:
+        '200':
+          description: Paginated list of reviews written by the requested user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedReviewsResponse'
+        '400':
+          description: The user ID or one of the optional filter query parameters is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: 'Provide either movie_id or tv_id, but not both.'
+        '500':
+          description: The server could not retrieve reviews for the requested user because of an unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: 'The server could not retrieve reviews for the requested user.'
+
   /v1/reviews/{id}:
     get:
       tags: [Reviews]

@@ -88,6 +88,57 @@ export const getReviewsByTitleId = async (req: Request, res: Response): Promise<
   }
 };
 
+// GET /reviews/user/:user_id — fetch reviews written by a specific user, optionally filtered to one movie or TV title.
+export const getReviewsByUserId = async (req: Request, res: Response): Promise<void> => {
+  const authorId = Number(req.params.user_id);
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(MAX_LIMIT, Math.max(1, Number(req.query.limit) || DEFAULT_LIMIT));
+  const skip = (page - 1) * limit;
+  const movieId = req.query.movie_id ? Number(req.query.movie_id) : undefined;
+  const tvId = req.query.tv_id ? Number(req.query.tv_id) : undefined;
+
+  const where: Prisma.ReviewWhereInput = {
+    authorId,
+    ...(movieId ? { title_id: movieId, media_type: 'movie' } : {}),
+    ...(tvId ? { title_id: tvId, media_type: 'tv' } : {}),
+  };
+
+  try {
+    const [reviews, total] = await Promise.all([
+      prisma.review.findMany({
+        where,
+        include: {
+          author: {
+            select: {
+              id: true,
+              display_name: true,
+              username: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.review.count({ where }),
+    ]);
+
+    res.status(200).json({
+      data: reviews,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (_error) {
+    res.status(500).json({
+      error: 'The server could not retrieve reviews for the requested user.',
+    });
+  }
+};
+
 export const getAllReviews = async (request: Request, response: Response): Promise<void> => {
   const page = Math.max(1, Number(request.query.page) || 1);
   const limit = Math.min(MAX_LIMIT, Math.max(1, Number(request.query.limit) || DEFAULT_LIMIT));

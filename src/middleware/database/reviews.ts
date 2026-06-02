@@ -9,10 +9,24 @@ const reviewTitleSchema = z.object({
   title_id: z.coerce.number().int().positive('title_id must be a positive integer'),
 });
 
+const reviewUserSchema = z.object({
+  user_id: z.coerce.number().int().positive('user_id must be a positive integer'),
+});
+
 const reviewPaginationSchema = z.object({
   page: z.coerce.number().int().positive('page must be a positive integer').optional(),
   limit: z.coerce.number().int().positive('limit must be a positive integer').optional(),
 });
+
+const reviewUserFilterSchema = reviewPaginationSchema
+  .extend({
+    movie_id: z.coerce.number().int().positive('movie_id must be a positive integer').optional(),
+    tv_id: z.coerce.number().int().positive('tv_id must be a positive integer').optional(),
+  })
+  .refine((value) => !(value.movie_id && value.tv_id), {
+    message: 'Only one media filter may be provided at a time.',
+    path: ['movie_id'],
+  });
 
 const createReviewSchema = z.object({
   title_id: z.number().int('title_id is required and must be an integer'),
@@ -51,6 +65,35 @@ export const validateReviewTitlePagination = (
   if (!queryResult.success) {
     res.status(400).json({
       error: 'One or more pagination query parameters are invalid.',
+      details: queryResult.error.format(),
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateReviewUserPagination = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const paramResult = reviewUserSchema.safeParse(req.params);
+  if (!paramResult.success) {
+    res.status(400).json({ error: 'The user ID in the path must be a positive integer.' });
+    return;
+  }
+
+  const queryResult = reviewUserFilterSchema.safeParse(req.query);
+  if (!queryResult.success) {
+    const fieldErrors = queryResult.error.flatten().fieldErrors;
+    const hasMediaConflict =
+      fieldErrors.movie_id?.includes('Only one media filter may be provided at a time.') ?? false;
+
+    res.status(400).json({
+      error: hasMediaConflict
+        ? 'Provide either movie_id or tv_id, but not both.'
+        : 'One or more review filter query parameters are invalid.',
       details: queryResult.error.format(),
     });
     return;

@@ -3,6 +3,7 @@ import { requireAuth, requireRole } from '../../middleware/requireAuth';
 import {
   validateReviewId,
   validateReviewTitlePagination,
+  validateReviewUserPagination,
   validateCreateReview,
   validateUpdateReview,
 } from '../../middleware/database/reviews';
@@ -11,6 +12,7 @@ import {
   getAllReviews,
   getReviewById,
   getReviewsByTitleId,
+  getReviewsByUserId,
   updateReview,
   deleteReview,
   upvoteReview,
@@ -23,6 +25,7 @@ const reviewsRouter = Router();
 
 // Public routes
 reviewsRouter.get('/title/:title_id', validateReviewTitlePagination, getReviewsByTitleId);
+reviewsRouter.get('/user/:user_id', validateReviewUserPagination, getReviewsByUserId);
 reviewsRouter.get('/:id', validateReviewId, getReviewById);
 
 // Authenticated routes

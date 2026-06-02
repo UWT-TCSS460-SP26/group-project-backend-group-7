@@ -167,6 +167,118 @@ describe('Reviews API Endpoints', () => {
     });
   });
 
+  describe('GET /v1/reviews/user/:user_id', () => {
+    it('should return a paginated list of reviews for a user filtered to a movie id', async () => {
+      const mockReviews = [
+        {
+          id: 5,
+          authorId: 2,
+          title_id: 246,
+          media_type: 'movie',
+          content: 'Great movie review',
+          header: 'Movie thoughts',
+          createdAt: '2026-04-26T12:00:00.000Z',
+          author: {
+            id: 2,
+            display_name: 'Kassie',
+            username: 'kassie',
+          },
+        },
+      ];
+
+      (prisma.review.findMany as jest.Mock).mockResolvedValue(mockReviews);
+      (prisma.review.count as jest.Mock).mockResolvedValue(1);
+
+      const response = await request(app).get('/v1/reviews/user/2?movie_id=246&page=1&limit=10');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        data: mockReviews,
+        pagination: {
+          page: 1,
+          limit: 10,
+          total: 1,
+          totalPages: 1,
+        },
+      });
+      expect(prisma.review.findMany).toHaveBeenCalledWith({
+        where: {
+          authorId: 2,
+          title_id: 246,
+          media_type: 'movie',
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              display_name: true,
+              username: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: 0,
+        take: 10,
+      });
+      expect(prisma.review.count).toHaveBeenCalledWith({
+        where: {
+          authorId: 2,
+          title_id: 246,
+          media_type: 'movie',
+        },
+      });
+    });
+
+    it('should return a paginated list of reviews for a user filtered to a tv id', async () => {
+      (prisma.review.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.review.count as jest.Mock).mockResolvedValue(0);
+
+      const response = await request(app).get('/v1/reviews/user/2?tv_id=101');
+
+      expect(response.status).toBe(200);
+      expect(prisma.review.findMany).toHaveBeenCalledWith({
+        where: {
+          authorId: 2,
+          title_id: 101,
+          media_type: 'tv',
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              display_name: true,
+              username: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: 0,
+        take: 25,
+      });
+    });
+
+    it('should return 400 if user_id is invalid', async () => {
+      const response = await request(app).get('/v1/reviews/user/0');
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('The user ID in the path must be a positive integer.');
+    });
+
+    it('should return 400 if both movie_id and tv_id are provided', async () => {
+      const response = await request(app).get('/v1/reviews/user/2?movie_id=246&tv_id=101');
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Provide either movie_id or tv_id, but not both.');
+    });
+
+    it('should return 400 if a media filter is invalid', async () => {
+      const response = await request(app).get('/v1/reviews/user/2?movie_id=abc');
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('One or more review filter query parameters are invalid.');
+    });
+  });
+
   describe('GET /v1/reviews/:id', () => {
     it('should return a specific review by its ID', async () => {
       const mockReview = { id: 1, content: 'Found Review' };
