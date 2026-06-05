@@ -210,3 +210,43 @@ describe('GET /v1/users/me/reviews', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('GET /v1/users/me/votes', () => {
+  it('returns a list of votes for the authenticated user', async () => {
+    const mockVotes = [
+      { reviewId: 10, type: 'UPVOTE' },
+      { reviewId: 12, type: 'DOWNVOTE' },
+    ];
+    (prisma.reviewVote.findMany as jest.Mock).mockResolvedValue(mockVotes);
+
+    const res = await request(app)
+      .get('/v1/users/me/votes')
+      .set('Authorization', `Bearer ${userToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([
+      { reviewId: 10, vote: 'up' },
+      { reviewId: 12, vote: 'down' },
+    ]);
+    expect(prisma.reviewVote.findMany).toHaveBeenCalledWith({
+      where: { userId: 1 },
+      select: { reviewId: true, type: true },
+    });
+  });
+
+  it('returns an empty list if the user has no votes', async () => {
+    (prisma.reviewVote.findMany as jest.Mock).mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/v1/users/me/votes')
+      .set('Authorization', `Bearer ${userToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+
+  it('returns 401 without a token', async () => {
+    const res = await request(app).get('/v1/users/me/votes');
+    expect(res.status).toBe(401);
+  });
+});

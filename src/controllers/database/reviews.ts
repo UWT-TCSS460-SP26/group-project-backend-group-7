@@ -257,17 +257,51 @@ export const deleteReview = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-// POST /reviews/:id/upvote — Increment the upvote count of a review
+// POST /reviews/:id/upvote — Increment the upvote count of a review (tracked)
 export const upvoteReview = async (req: Request, res: Response): Promise<void> => {
   const reviewId = Number(req.params.id);
+  const userId = req.user!.id;
 
   try {
-    const updatedReview = await prisma.review.update({
-      where: { id: reviewId },
-      data: {
-        upvotes: { increment: 1 },
-      },
+    const updatedReview = await prisma.$transaction(async (tx) => {
+      const existingVote = await tx.reviewVote.findUnique({
+        where: { userId_reviewId: { userId, reviewId } },
+      });
+
+      if (existingVote) {
+        if (existingVote.type === 'UPVOTE') {
+          // Already upvoted, just return current review
+          return tx.review.findUnique({ where: { id: reviewId } });
+        } else {
+          // Switching from DOWNVOTE to UPVOTE
+          await tx.reviewVote.update({
+            where: { userId_reviewId: { userId, reviewId } },
+            data: { type: 'UPVOTE' },
+          });
+          return tx.review.update({
+            where: { id: reviewId },
+            data: {
+              downvotes: { decrement: 1 },
+              upvotes: { increment: 1 },
+            },
+          });
+        }
+      }
+
+      // New upvote
+      await tx.reviewVote.create({
+        data: { userId, reviewId, type: 'UPVOTE' },
+      });
+      return tx.review.update({
+        where: { id: reviewId },
+        data: { upvotes: { increment: 1 } },
+      });
     });
+
+    if (!updatedReview) {
+      res.status(404).json({ error: 'No review was found for the provided ID.' });
+      return;
+    }
     res.status(200).json(updatedReview);
   } catch (err: unknown) {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -280,17 +314,51 @@ export const upvoteReview = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-// POST /reviews/:id/downvote — Increment the downvote count of a review
+// POST /reviews/:id/downvote — Increment the downvote count of a review (tracked)
 export const downvoteReview = async (req: Request, res: Response): Promise<void> => {
   const reviewId = Number(req.params.id);
+  const userId = req.user!.id;
 
   try {
-    const updatedReview = await prisma.review.update({
-      where: { id: reviewId },
-      data: {
-        downvotes: { increment: 1 },
-      },
+    const updatedReview = await prisma.$transaction(async (tx) => {
+      const existingVote = await tx.reviewVote.findUnique({
+        where: { userId_reviewId: { userId, reviewId } },
+      });
+
+      if (existingVote) {
+        if (existingVote.type === 'DOWNVOTE') {
+          // Already downvoted, just return current review
+          return tx.review.findUnique({ where: { id: reviewId } });
+        } else {
+          // Switching from UPVOTE to DOWNVOTE
+          await tx.reviewVote.update({
+            where: { userId_reviewId: { userId, reviewId } },
+            data: { type: 'DOWNVOTE' },
+          });
+          return tx.review.update({
+            where: { id: reviewId },
+            data: {
+              upvotes: { decrement: 1 },
+              downvotes: { increment: 1 },
+            },
+          });
+        }
+      }
+
+      // New downvote
+      await tx.reviewVote.create({
+        data: { userId, reviewId, type: 'DOWNVOTE' },
+      });
+      return tx.review.update({
+        where: { id: reviewId },
+        data: { downvotes: { increment: 1 } },
+      });
     });
+
+    if (!updatedReview) {
+      res.status(404).json({ error: 'No review was found for the provided ID.' });
+      return;
+    }
     res.status(200).json(updatedReview);
   } catch (err: unknown) {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -303,64 +371,70 @@ export const downvoteReview = async (req: Request, res: Response): Promise<void>
   }
 };
 
-// POST /reviews/:id/remove-upvote — Decrement the upvote count of a review
+// POST /reviews/:id/remove-upvote — Decrement the upvote count of a review (tracked)
 export const removeUpvoteReview = async (req: Request, res: Response): Promise<void> => {
   const reviewId = Number(req.params.id);
+  const userId = req.user!.id;
 
   try {
-    const existingReview = await prisma.review.findUnique({
-      where: { id: reviewId },
+    const updatedReview = await prisma.$transaction(async (tx) => {
+      const existingVote = await tx.reviewVote.findUnique({
+        where: { userId_reviewId: { userId, reviewId } },
+      });
+
+      if (!existingVote || existingVote.type !== 'UPVOTE') {
+        // No upvote to remove
+        return tx.review.findUnique({ where: { id: reviewId } });
+      }
+
+      await tx.reviewVote.delete({
+        where: { userId_reviewId: { userId, reviewId } },
+      });
+      return tx.review.update({
+        where: { id: reviewId },
+        data: { upvotes: { decrement: 1 } },
+      });
     });
 
-    if (!existingReview) {
+    if (!updatedReview) {
       res.status(404).json({ error: 'No review was found for the provided ID.' });
       return;
     }
-    if (existingReview.upvotes <= 0) {
-      res.status(400).json({
-        error: 'The upvote count is already zero, so there is no upvote to remove.',
-      });
-      return;
-    }
-
-    const updatedReview = await prisma.review.update({
-      where: { id: reviewId },
-      data: {
-        upvotes: { decrement: 1 },
-      },
-    });
     res.status(200).json(updatedReview);
   } catch (_error) {
     res.status(500).json({ error: 'The server could not remove the upvote.' });
   }
 };
 
-// POST /reviews/:id/remove-downvote — Decrement the downvote count of a review
+// POST /reviews/:id/remove-downvote — Decrement the downvote count of a review (tracked)
 export const removeDownvoteReview = async (req: Request, res: Response): Promise<void> => {
   const reviewId = Number(req.params.id);
+  const userId = req.user!.id;
 
   try {
-    const existingReview = await prisma.review.findUnique({
-      where: { id: reviewId },
+    const updatedReview = await prisma.$transaction(async (tx) => {
+      const existingVote = await tx.reviewVote.findUnique({
+        where: { userId_reviewId: { userId, reviewId } },
+      });
+
+      if (!existingVote || existingVote.type !== 'DOWNVOTE') {
+        // No downvote to remove
+        return tx.review.findUnique({ where: { id: reviewId } });
+      }
+
+      await tx.reviewVote.delete({
+        where: { userId_reviewId: { userId, reviewId } },
+      });
+      return tx.review.update({
+        where: { id: reviewId },
+        data: { downvotes: { decrement: 1 } },
+      });
     });
 
-    if (!existingReview) {
+    if (!updatedReview) {
       res.status(404).json({ error: 'No review was found for the provided ID.' });
       return;
     }
-    if (existingReview.downvotes <= 0) {
-      res.status(400).json({
-        error: 'The downvote count is already zero, so there is no downvote to remove.',
-      });
-      return;
-    }
-
-    const updatedReview = await prisma.review.update({
-      where: { id: reviewId },
-      data: {
-        downvotes: { decrement: 1 },
-      },
-    });
     res.status(200).json(updatedReview);
   } catch (err: unknown) {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {

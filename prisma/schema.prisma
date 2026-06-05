@@ -2,51 +2,65 @@ generator client {
   provider = "prisma-client-js"
 }
 
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-
 model User {
-  id           Int       @id @default(autoincrement())
-  subjectId    String    @unique
-  username     String    @unique
-  email        String    @unique
+  id           Int          @id @default(autoincrement())
+  subjectId    String       @unique
+  username     String       @unique
+  email        String       @unique
   display_name String?
-  role         Int       @default(2)
+  role         Int          @default(2)
   reviews      Review[]
   ratings      Rating[]
   issues       Issue[]
-
+  reviewVotes  ReviewVote[]
 
   @@map("users")
 }
 
-
 model Review {
-  id        Int      @id @default(autoincrement())
-  authorId  Int?     // foreign key to User, nullable to allow for reviews without an author
-  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull) // RELATIONSHIP USER 1 : N REVIEW
-  content   String?
-  createdAt DateTime @default(now())
-  header    String?
-  upvotes   Int      @default(0)
-  downvotes Int      @default(0)
-  title_id  Int
+  id         Int          @id @default(autoincrement())
+  authorId   Int? // foreign key to User, nullable to allow for reviews without an author
+  author     User?        @relation(fields: [authorId], references: [id], onDelete: SetNull) // RELATIONSHIP USER 1 : N REVIEW
+  content    String?
+  createdAt  DateTime     @default(now())
+  header     String?
+  upvotes    Int          @default(0)
+  downvotes  Int          @default(0)
+  title_id   Int
   media_type String?
+  votes      ReviewVote[]
 
   @@unique([authorId, title_id])
   @@map("reviews")
 }
 
+model ReviewVote {
+  userId   Int
+  reviewId Int
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  review   Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  type     VoteType
+
+  @@id([userId, reviewId])
+  @@map("review_votes")
+}
+
+enum VoteType {
+  UPVOTE
+  DOWNVOTE
+}
+
 model Rating {
-  id       Int   @id @default(autoincrement())
-  authorId Int?
-  author   User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  rating   Int
-  title_id Int
+  id         Int     @id @default(autoincrement())
+  authorId   Int?
+  author     User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  rating     Int
+  title_id   Int
   media_type String?
 
   @@unique([authorId, title_id])
@@ -60,9 +74,9 @@ enum IssueStatus {
 }
 
 model Issue {
-  id        Int      @id @default(autoincrement())
-  priority  Int       @default(2)
-  author    User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  id              Int         @id @default(autoincrement())
+  priority        Int         @default(2)
+  author          User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
   title           String
   description     String
   reproSteps      String?
@@ -70,7 +84,7 @@ model Issue {
   reporterContact String
   status          IssueStatus @default(UNSOLVED)
   createdAt       DateTime    @default(now())
-  authorId        Int?    
+  authorId        Int?
 
   @@map("issues")
 }

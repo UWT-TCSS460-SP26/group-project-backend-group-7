@@ -1111,6 +1111,50 @@ paths:
               example:
                 error: 'The server could not retrieve your reviews.'
 
+  /v1/users/me/votes:
+    get:
+      tags: [Front End API]
+      summary: Get the authenticated user's review votes
+      description: Returns a list of all reviews the authenticated user has voted on, along with the vote direction ('up' or 'down'). Use this to show vote status in the frontend and prevent duplicate voting.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of the user's review votes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        reviewId:
+                          type: integer
+                          example: 12
+                        vote:
+                          type: string
+                          enum: [up, down]
+                          example: up
+        '401':
+          description: The request did not include a valid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: 'The bearer token is missing, invalid, or expired.'
+        '500':
+          description: The server could not retrieve the user's votes because of an unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: 'The server could not retrieve your votes.'
+
   /v1/community/top-rated:
     get:
       tags: [Front End API]

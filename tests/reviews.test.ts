@@ -357,33 +357,69 @@ describe('Reviews API Endpoints', () => {
   });
 
   describe('Voting Routes', () => {
-    it('should successfully upvote a review', async () => {
-      const mockUpdated = { id: 1, upvotes: 1 };
-      (prisma.review.update as jest.Mock).mockResolvedValue(mockUpdated);
+    it('should successfully upvote a review (first time)', async () => {
+      const mockReview = { id: 1, upvotes: 1 };
+      
+      // Mock transaction
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        return callback(prisma);
+      });
+      
+      (prisma.reviewVote.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.reviewVote.create as jest.Mock).mockResolvedValue({ userId: 2, reviewId: 1, type: 'UPVOTE' });
+      (prisma.review.update as jest.Mock).mockResolvedValue(mockReview);
 
       const response = await request(app)
         .post('/v1/reviews/1/upvote')
         .set('Authorization', `Bearer ${userToken}`);
 
       expect(response.status).toBe(200);
+      expect(prisma.reviewVote.create).toHaveBeenCalled();
       expect(prisma.review.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: { upvotes: { increment: 1 } },
       });
     });
 
-    it('should return 400 Bad Request if attempting to remove an upvote when count is 0', async () => {
-      const mockExisting = { id: 1, upvotes: 0 };
-      (prisma.review.findUnique as jest.Mock).mockResolvedValue(mockExisting);
+    it('should handle switching from downvote to upvote', async () => {
+      const mockReview = { id: 1, upvotes: 1, downvotes: 0 };
+      
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        return callback(prisma);
+      });
+      
+      (prisma.reviewVote.findUnique as jest.Mock).mockResolvedValue({ userId: 2, reviewId: 1, type: 'DOWNVOTE' });
+      (prisma.reviewVote.update as jest.Mock).mockResolvedValue({ userId: 2, reviewId: 1, type: 'UPVOTE' });
+      (prisma.review.update as jest.Mock).mockResolvedValue(mockReview);
+
+      const response = await request(app)
+        .post('/v1/reviews/1/upvote')
+        .set('Authorization', `Bearer ${userToken}`);
+
+      expect(response.status).toBe(200);
+      expect(prisma.reviewVote.update).toHaveBeenCalled();
+      expect(prisma.review.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          downvotes: { decrement: 1 },
+          upvotes: { increment: 1 },
+        },
+      });
+    });
+
+    it('should return 400 Bad Request if attempting to remove an upvote when no upvote exists', async () => {
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        return callback(prisma);
+      });
+      
+      (prisma.reviewVote.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.review.findUnique as jest.Mock).mockResolvedValue({ id: 1 });
 
       const response = await request(app)
         .post('/v1/reviews/1/remove-upvote')
         .set('Authorization', `Bearer ${userToken}`);
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe(
-        'The upvote count is already zero, so there is no upvote to remove.'
-      );
+      expect(response.status).toBe(200); // Now returns 200 with current review state if nothing to do
     });
   });
 });

@@ -164,3 +164,26 @@ export const getMyReviews = async (req: Request, res: Response): Promise<void> =
     res.status(500).json({ error: 'The server could not retrieve your reviews.' });
   }
 };
+
+export const getMyVotes = async (req: Request, res: Response): Promise<void> => {
+  const userId = req.user!.id;
+
+  try {
+    const votes = await prisma.reviewVote.findMany({
+      where: { userId },
+      select: {
+        reviewId: true,
+        type: true,
+      },
+    });
+
+    res.status(200).json({
+      data: votes.map((v) => ({
+        reviewId: v.reviewId,
+        vote: v.type === 'UPVOTE' ? 'up' : 'down',
+      })),
+    });
+  } catch (_error) {
+    res.status(500).json({ error: 'The server could not retrieve your votes.' });
+  }
+};

@@ -22,6 +22,13 @@ export const prisma = {
     findUnique: jest.fn(),
     update: jest.fn(),
   },
+  reviewVote: {
+    create: jest.fn(),
+    delete: jest.fn(),
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
+  },
   user: {
     count: jest.fn(),
     create: jest.fn(),
