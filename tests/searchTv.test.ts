@@ -167,6 +167,25 @@ describe('TV Search Proxy Routes', () => {
     });
   });
 
+  it('GET /v1/tv/search/genre - supports "genre" alias parameter', async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      mockFetchResponse({
+        page: 1,
+        total_pages: 1,
+        total_results: 1,
+        results: [tvShow()],
+      }) as Awaited<ReturnType<typeof fetch>>
+    );
+
+    const response = await request(app).get('/v1/tv/search/genre').query({ genre: 'drama' });
+
+    expect(response.status).toBe(200);
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://api.themoviedb.org/3/discover/tv?with_genres=18&page=1',
+      expect.any(Object)
+    );
+  });
+
   it('GET /v1/tv/search/genre - returns 404 for an unknown genre', async () => {
     const response = await request(app).get('/v1/tv/search/genre').query({ q: 'not-a-genre' });
 

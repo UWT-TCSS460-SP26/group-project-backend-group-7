@@ -76,6 +76,19 @@ const formatMovieSearchResponse = (data: TMDBMovieSearchResponse) => {
   };
 };
 
+const formatMovies = (movies: TMDBMovie[], page: number) => {
+  const pageSize = 20;
+  const start = (page - 1) * pageSize;
+  const pagedMovies = movies.slice(start, start + pageSize);
+
+  return formatMovieSearchResponse({
+    page,
+    results: pagedMovies,
+    total_pages: Math.ceil(movies.length / pageSize),
+    total_results: movies.length,
+  });
+};
+
 export const getSearchedMovieTitle = async (request: Request, response: Response) => {
   const title = request.query.q as string;
 
@@ -113,13 +126,13 @@ export const getSearchedMovieTitle = async (request: Request, response: Response
 };
 
 export const getSearchedMovieGenre = async (request: Request, response: Response) => {
-  const genre = request.query.q as string;
+  const genre = (request.query.q ?? request.query.genre) as string;
   const page = Number(request.query.page ?? 1);
 
   if (typeof genre !== 'string' || genre === null || genre.trim() === '') {
     return response.status(400).json({
       error: 400,
-      message: 'The required query parameter "q" must be a non-empty movie genre name.',
+      message: 'The required query parameter "q" or "genre" must be a non-empty movie genre name.',
     });
   }
 
@@ -164,3 +177,104 @@ export const getSearchedMovieGenre = async (request: Request, response: Response
     });
   }
 };
+
+export const getSearchedMovieCast = async (request: Request, response: Response) => {
+  const cast = request.query.q as string;
+  const genre = (request.query.genre ?? '') as string;
+  const page = Number(request.query.page ?? 1);
+
+  if (page <= 0 || !Number.isInteger(page)) {
+    return response.status(400).json({
+      error: 400,
+      message: 'The query parameter "page" must be a positive integer.',
+    });
+  }
+
+  if (typeof genre !== 'string') {
+    return response.status(400).json({
+      error: 400,
+      message: 'The optional query parameter "genre" must be a string.',
+    });
+  }
+
+  let genreCode: number = -1;
+  if (genre !== '') {
+    genreCode = GENRE[genre.toLowerCase().replace(/\s+/g, '_')];
+
+    if (!genreCode) {
+      return response.status(404).json({
+        error: 404,
+        message: 'The provided movie genre could not be matched to a supported genre.',
+      });
+    }
+  }
+
+  if (typeof cast !== 'string' || cast.trim() === '' || cast === null) {
+    return response.status(400).json({
+      error: 400,
+      message: 'The required query parameter "q" must be a non-empty cast member name.',
+    });
+  }
+
+  try {
+    const castIdResult = await fetch(
+      `https://api.themoviedb.org/3/search/person?query=${encodeURIComponent(cast)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.TMDB_API_TOKEN}`,
+          accept: 'application/json',
+        },
+      }
+    );
+
+    if (!castIdResult.ok) {
+      return response.status(castIdResult.status).json({
+        error: castIdResult.status,
+        message: 'TMDB could not complete the cast member lookup request.',
+      });
+    }
+
+    const castData = (await castIdResult.json()) as {
+      results: { id: number }[];
+    };
+
+    if (castData.results.length === 0) {
+      return response.status(404).json({
+        error: 404,
+        message: 'No cast member was found for the provided search term.',
+      });
+    }
+
+    const castId = castData.results[0].id;
+
+    const castMovieResult = await fetch(`https://api.themoviedb.org/3/person/${castId}/movie_credits`, {
+      headers: {
+        Authorization: `Bearer ${process.env.TMDB_API_TOKEN}`,
+        accept: 'application/json',
+      },
+    });
+
+    if (!castMovieResult.ok) {
+      return response.status(castMovieResult.status).json({
+        error: castMovieResult.status,
+        message: 'TMDB could not retrieve movie credits for the requested cast member.',
+      });
+    }
+
+    const data = (await castMovieResult.json()) as { cast: TMDBMovie[] };
+
+    if (genreCode === -1) {
+      return response.status(200).json(formatMovies(data.cast, page));
+    } else {
+      const filteredMovies = data.cast.filter((movie) => movie.genre_ids.includes(genreCode));
+
+      return response.status(200).json(formatMovies(filteredMovies, page));
+    }
+  } catch (_error) {
+    return response.status(502).json({
+      error: 502,
+      message: 'The API could not reach TMDB while searching for movies by cast.',
+    });
+  }
+};
+

@@ -281,6 +281,27 @@ describe('Movie Search Proxy Routes', () => {
     });
   });
 
+  it('GET /v1/movie/search/genre - supports "genre" alias parameter', async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      mockFetchResponse({
+        page: 1,
+        total_pages: 1,
+        total_results: 1,
+        results: [movie()],
+      }) as Awaited<ReturnType<typeof fetch>>
+    );
+
+    const response = await request(app)
+      .get('/v1/movie/search/genre')
+      .query({ genre: 'action' });
+
+    expect(response.status).toBe(200);
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://api.themoviedb.org/3/discover/movie?with_genres=28&page=1',
+      expect.any(Object)
+    );
+  });
+
   it('GET /v1/movie/search/genre - normalizes spaced genre names', async () => {
     global.fetch = jest.fn().mockResolvedValue(
       mockFetchResponse({
@@ -302,7 +323,7 @@ describe('Movie Search Proxy Routes', () => {
     );
   });
 
-  it('GET /v1/movie/search/genre - returns 400 when q is missing', async () => {
+  it('GET /v1/movie/search/genre - returns 400 when both q and genre are missing', async () => {
     global.fetch = jest.fn();
 
     const response = await request(app).get('/v1/movie/search/genre');
@@ -310,10 +331,89 @@ describe('Movie Search Proxy Routes', () => {
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
       error: 400,
-      message: 'The required query parameter "q" must be a non-empty movie genre name.',
+      message: 'The required query parameter "q" or "genre" must be a non-empty movie genre name.',
     });
     expect(global.fetch).not.toHaveBeenCalled();
   });
+
+  it('GET /v1/movie/search/cast - returns cast movie credits filtered by genre', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        mockFetchResponse({
+          results: [{ id: 31 }],
+        }) as Awaited<ReturnType<typeof fetch>>
+      )
+      .mockResolvedValueOnce(
+        mockFetchResponse({
+          cast: [
+            movie({
+              id: 10,
+              title: 'Forest Gump',
+              genre_ids: [35, 18, 10751],
+            }),
+            movie({
+              id: 20,
+              title: 'Action Movie Credit',
+              genre_ids: [28, 18],
+            }),
+          ],
+        }) as Awaited<ReturnType<typeof fetch>>
+      );
+
+    const response = await request(app)
+      .get('/v1/movie/search/cast')
+      .query({ q: 'tom hanks', genre: 'action' });
+
+    expect(response.status).toBe(200);
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      1,
+      'https://api.themoviedb.org/3/search/person?query=tom%20hanks',
+      expect.any(Object)
+    );
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
+      'https://api.themoviedb.org/3/person/31/movie_credits',
+      expect.any(Object)
+    );
+    expect(response.body.totalResults).toBe(1);
+    expect(response.body.results).toHaveLength(1);
+    expect(response.body.results[0]).toMatchObject({
+      id: 20,
+      title: 'Action Movie Credit',
+      genreIds: [28, 18],
+    });
+  });
+
+  it('GET /v1/movie/search/cast - returns 404 when the cast member is not found', async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      mockFetchResponse({
+        results: [],
+      }) as Awaited<ReturnType<typeof fetch>>
+    );
+
+    const response = await request(app).get('/v1/movie/search/cast').query({ q: 'unknown person' });
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({
+      error: 404,
+      message: 'No cast member was found for the provided search term.',
+    });
+  });
+
+  it('GET /v1/movie/search/cast - returns 400 when q is missing', async () => {
+    global.fetch = jest.fn();
+
+    const response = await request(app).get('/v1/movie/search/cast');
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: 400,
+      message: 'The required query parameter "q" must be a non-empty cast member name.',
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
 
   it('GET /v1/movie/search/genre - returns 400 when page is invalid', async () => {
     global.fetch = jest.fn();

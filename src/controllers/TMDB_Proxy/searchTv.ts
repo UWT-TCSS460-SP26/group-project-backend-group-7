@@ -144,14 +144,14 @@ export const getSearchedTVTitle = async (request: Request, response: Response) =
  * @returns A list of TV shows with the given genre
  */
 export const getSearchedTVGenre = async (request: Request, response: Response) => {
-  const genre = request.query.q as string;
+  const genre = (request.query.q ?? request.query.genre) as string;
 
   const page = Number(request.query.page ?? 1);
 
   if (typeof genre !== 'string' || genre === null || genre.trim() === '') {
     return response.status(400).json({
       error: 400,
-      message: 'The required query parameter "q" must be a non-empty TV genre name.',
+      message: 'The required query parameter "q" or "genre" must be a non-empty TV genre name.',
     });
   }
 
@@ -171,27 +171,35 @@ export const getSearchedTVGenre = async (request: Request, response: Response) =
     });
   }
 
-  const result = await fetch(
-    `https://api.themoviedb.org/3/discover/tv?with_genres=${genreCode}&page=${page}`,
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.TMDB_API_TOKEN}`,
-        accept: 'application/json',
-      },
-    }
-  );
+  try {
+    const result = await fetch(
+      `https://api.themoviedb.org/3/discover/tv?with_genres=${genreCode}&page=${page}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.TMDB_API_TOKEN}`,
+          accept: 'application/json',
+        },
+      }
+    );
 
-  if (!result.ok) {
-    return response.status(result.status).json({
-      error: result.status,
-      message: 'TMDB could not complete the TV genre search request.',
+    if (!result.ok) {
+      return response.status(result.status).json({
+        error: result.status,
+        message: 'TMDB could not complete the TV genre search request.',
+      });
+    }
+
+    const data = (await result.json()) as TMDBTVSearchResponse;
+
+    return response.status(200).json(formatTVSearchResponse(data));
+  } catch (_error) {
+    return response.status(502).json({
+      error: 502,
+      message: 'The API could not reach TMDB while searching for TV shows by genre.',
     });
   }
-
-  const data = (await result.json()) as TMDBTVSearchResponse;
-
-  return response.status(200).json(formatTVSearchResponse(data));
 };
+
 
 /**
  * query with ?q={enter the actors name}
